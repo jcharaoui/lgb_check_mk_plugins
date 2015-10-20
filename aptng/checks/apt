@@ -26,47 +26,34 @@
 #6.0.3
 #x11-common Debian-Security:6.0/stable
 
-# Configure per repository severity
-#
-# 1 WARNING ; 2 CRITICAL 
-apt_repository_severity = {
-  'Debian-Security' : 2,
-  'debian-volatile' : 1,
-  'Unofficial'      : 1,
-  '__default__'     : 1,
-}
-
 def inventory_apt(checkname, info):
     if len(info) > 0:
         return [(None, None)]
 
 # the check function
 def check_apt(_no_item, _no_params, info):
-    apt_upgrades = {}
     level        = 0
     msg          = ""
     updates      = 0
-    
+    crit_updates = 0
+
     # Parse the agent output
     deb_release  = info[1][0]
     reboot_req   = info[0][0]
 
     if len(info) > 2:
         packages  = info[2:]
-        
+
         for package in packages:
-            name   = package[0]
             updates += 1
-            source = package[1].split(' ')[0].split(':')[0]
-            if source in apt_repository_severity:
-                severity = apt_repository_severity[source]
-            else:
-                severity = apt_repository_severity['__default__']
+            name     = package[0]
 
-            if severity >= 2:
+            if level == 0:
+                level = 1
+
+            if 'Debian-Security' in ''.join(package[1:]):
+                level = 2
                 crit_updates += 1
-
-            level = max(level, severity)
 
         if (updates > 0) and (crit_updates == updates):
             msg = "%i critical updates available" % crit_updates
@@ -76,7 +63,7 @@ def check_apt(_no_item, _no_params, info):
             msg = "%i updates available" % updates
 
     if (reboot_req == "yes") and (level == 0):
-        level = 1 
+        level = 1
         msg = "reboot required (!)"
 
     if level > 0:
